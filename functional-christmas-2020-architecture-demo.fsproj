@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="Small.fs" />
+        <Compile Include="Large.fs" />
+        <Compile Include="Program.fs" />
+        <Content Include="LICENSE" />
+        <Content Include="README.org" />
+    </ItemGroup>
+
+</Project>
