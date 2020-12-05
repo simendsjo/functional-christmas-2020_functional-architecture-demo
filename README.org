@@ -1,11 +1,13 @@
 #+TITLE: A Functional Architecture Demonstration
 
+* About
+
 Home: https://github.com/simendsjo/functional-christmas-2020_functional-architecture-demo
 
 This repository is a blogpost for the Functional Christmas 2020 Advent Calendar:
-https://functional.christmas/2020. The main experience report is in the file
-~Large.fs~, while the smaller demo application for the shorter advent blogpost
-is located in ~Small.fs~.
+https://functional.christmas/2020/22. The main experience report is in the file
+[[file:Large.fs][Large.fs]], while the smaller demo application for the shorter advent blogpost
+is located in [[file:Small.fs][Small.fs]].
 
 Type ~dotnet run~ to run the demo.
 
@@ -64,7 +66,7 @@ there are never a chance of introducing an error elsewhere. Changes one place ca
 never affect something else.
 
 * Smaller demo
-We'll go through the key parts of our ~Small.fs~. More/different comments are in
+We'll go through the key parts of our [[file:Small.fs][Small]] demo. More/different comments are in
 the actual source file, so I encourage you to look there as well.
 
 The demo will model changes to an Order Line in an online shopping chart. It's
@@ -83,6 +85,7 @@ type Key = int
 type Value = int
 #+end_src
 
+** Defining a custom language for our domain
 We encode the possible operations on an OrderLine using a Discriminated Union
 (also called a Sum Type). These operations are the verbs in our domain, and our
 Embedded Domain Specific Language (EDSL) for manipulating OrderLine items.
@@ -104,6 +107,7 @@ type Operation =
     | Decr of Key
 #+end_src
 
+** Application state as an immutable record
 The State is where we hold information about all OrderItems. The state includes
 things necessary to execute our lanugage. In addition, we keep things which is
 convenient for other usecases, but could in theory just as well be held in other
@@ -136,6 +140,7 @@ type State = {
     }
 #+end_src
 
+** Helpers for "manipulating" state, i.e. State -> State functions
 As you start creating mappings from ~ApplicationEvent~ to ~Operation~, you'll
 quickly see patterns repeating for state querying and manipulation. I like to
 extract these to helper functions as I go. For our demo, I've created three
@@ -166,6 +171,7 @@ let setValue (key : Key) (value : Value) (state : State) : State =
     setInitialAndValue key initial value state
 #+end_src
 
+** Interpreting our language and executing on State
 With the helper functions, we're now able to process our language. We'll look at
 each operation, and manipulate the state accordingly. As a final step, we log
 the operation we've executed. Even though we "execute" the language, we're not
@@ -198,6 +204,7 @@ let execute (op : Operation) (state : State) : State =
         { state with Audit = op :: state.Audit }
 #+end_src
 
+** Interpreting our language and auditlog to persist to database
 Now that we have a way of changing the state, we can write an interpreter that
 runs side-effects. This simulates writing to a database. Remember that this
 interpreter has its state in ~State~, so it has to return a copy of it. In
@@ -217,6 +224,7 @@ let persist (state : State) : State =
     ) state
 #+end_src
 
+** Mapping application events to our custom language
 We still haven't hooked our implementation up to the outer application, but
 let's do this now. The key part is our ~Handler~ function which does the
 mapping. It can access the state in case it needs to look at anything, and it
@@ -320,6 +328,7 @@ let handlers : Handler list = [
 ]
 #+end_src
 
+** Demoing our implementation
 And that should be everything needed to support our application. We can test it
 by running some events through the system. We first create a couple of
 orderlines and does some changes to them. Then we persist the result, and
@@ -403,6 +412,7 @@ New state: { Data = map [(1, (1, 2)); (2, (1, 2))]
   LastPersisted = Decr 2 }
 #+end_example
 
+** Concluding remarks
 This concludes our little demo, with an architecture which is pure, immutable,
 and side-effect free. The side-effects is pushed to the boundaries, making the
 core of the application easy to test and make bug free. Check out the repository
