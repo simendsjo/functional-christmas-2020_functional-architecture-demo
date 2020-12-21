@@ -18,17 +18,19 @@ Type ~dotnet run~ to run the demo.
 When I first started learning functional programming, I had already been
 programming for many years, mostly in object oriented languages the last decade.
 How would the architecture for a functional program look like? How can we avoid
-mutation, which is a cornerstone of OOP? How can functions be used as an abstraction?
+mutation, which is a cornerstone of OOP? How can functions be used as an
+abstraction?
+
 In this post, I'm going to show the design of a functional program which solved
 a difficult problem while being easy to get right and performant. By avoiding
-mutation, we were also able to implement "time-travel", easy rollbacks and stale
-data detection.
+mutation, we were also able to implement "time-travel" to look how an action
+would affect the future, easy rollbacks and stale data detection.
 
 In OOP, there are often deep call-stacks, which I consider a smell itself, and
 mutation of state and side-effects often happen at a deep level. When
 constructing an application which should be mostly pure with immutable data, we
 have to push the side-effects up the call-stack to the outer boundary. This
-means that we need to return to the called rather than keep diving deeper in the
+means that we need to return to the caller rather than keep diving deeper in the
 call-stack.
 
 To recap some terminology:
@@ -47,29 +49,29 @@ There are some key parts in the architecture I'm demoing here:
 
 You don't need an event driven application to take advantage of the architecture
 in this post. Using just immutable state with pure functions to change the
-state, will still give most of the benefits. Having events and a custom language
-might be a nice addition, or it might be overengineering.
+state, will still yield most of the benefits. Having events and a custom language
+might be a nice addition, or it might be over-engineering.
 
-The flow of the application is then:
-- Something triggers an ApplicationEvent
-- Handlers translates to Operations
-- We run each Operation on the state, producing an updated state
+Given the above parts, the flow of the application is then:
+- Something triggers an ~ApplicationEvent~
+- ~Handlers~ translates to ~Operations~
+- We run each ~Operation~ on the ~State~, producing an updated ~State~
 - We use the new state for fun and profit
 
 When the new state is produced, we can act on the result by interpreting the
 changes. We might validate the changes. We might save to the database. We might
 detect stale data by rerunning the application. We might use it for
-transactions. Our actual implementation does all this, not just without any
+transactions. Our production implementation does all this, not just without any
 side-effects or mutation, but *because* there are no side-effects or mutations.
 We can safely rerun things, throw away things, copy, interpret results, and
-there are never a chance of introducing an error elsewhere. Changes one place can
-never affect something else.
+there are never a chance of introducing an error outside of our changes --
+Changes in one place can never affect something else.
 
 * Smaller demo
 We'll go through the key parts of our [[file:Small.fs][Small]] demo. More/different comments are in
 the actual source file, so I encourage you to look there as well.
 
-The demo will model changes to an Order Line in an online shopping chart. It's
+The demo will model changes to an Order Line in an online shopping chart.  It's
 probably completely overkill for such use, but it's difficult to create good
 examples -- see an actual use-case in the Large demo.
 
@@ -90,13 +92,13 @@ We encode the possible operations on an OrderLine using a Discriminated Union
 (also called a Sum Type). These operations are the verbs in our domain, and our
 Embedded Domain Specific Language (EDSL) for manipulating OrderLine items.
 
-Only Set is needed to support our operations, but we create more constructs in
-our language. Putting more in the language will make mapping events to
-operations simpler as the language is more expressive, at the cost of a more
-complex language. It's difficult to decide what goes in the language, and what
-should only be helper functions. If you need to distinguish between different
-operations (e.g. increment vs set), having them as separate operations might be
-a good idea.
+Only Set is needed to support our described operations, but we create some more
+constructs in our language. Putting more in the language will make mapping
+events to operations simpler as the language is more expressive, at the cost of
+a more complex language. It's difficult to decide what goes in the language, and
+what should only be helper functions. If you need to distinguish between
+different operations (e.g. increment vs set) when interpreting the operations,
+having them as separate operations might be a good idea.
 
 #+begin_src fsharp
 type Operation =
@@ -120,11 +122,11 @@ changes to disk. Depending on the interpreter and application, this state might
 be better to keep separate.
 
 Having a single structure makes it easy to have a clean architecture without
-much boilerplate (~State -> State~ functions), but it can be difficult to find
-out what information is used where, and who changes what. As with any decision,
-it's a tradeoff, but having a simple architecture might be more beneficial than
-a clean separation of state -- remember, there is no mutation or side-effects in
-the functions which operates on the state!
+much boilerplate (just ~State -> State~ functions), but it can be difficult to
+find out what information is used where, and who changes what. As with any
+decision, it's a tradeoff, but having a simple architecture might be more
+beneficial than a clean separation of state -- remember, there is no mutation or
+side-effects in the functions which operates on the state!
 
 #+begin_src fsharp
 type State = {
@@ -209,7 +211,7 @@ Now that we have a way of changing the state, we can write an interpreter that
 runs side-effects. This simulates writing to a database. Remember that this
 interpreter has its state in ~State~, so it has to return a copy of it. In
 Haskell, this would be a ~State -> IO State~ function as it has side-effects,
-but in F#, we just do side-effects without help from the type-system.  The
+but in F#, we just do side-effects without help from the type-system. The
 interpreters can be made more efficient by avoiding unnecessary work. [Add 1,
 Remove 1] can be reduced to a noop.
 
@@ -232,7 +234,8 @@ returns an ~Operation option~ in case the ~ApplicationEvent~ should trigger a
 change in the state. An alternative implementation could return ~Operation list~
 instead to support 0+ rather than just 0-1. For events which should trigger more
 than one change, we can just write multiple handlers, which is what we did in
-our production application.
+our production application. In retrospect, a list would have been more
+expressive, and might have made some mappings more readable.
 
 #+begin_src fsharp
 type ApplicationEvent(key) =
@@ -281,8 +284,11 @@ let onEvent<'ev, 'op when 'ev :> ApplicationEvent> ctor (handler : ('ev -> 'op))
 Now we can create the mappings themselves. As our language is complex, the
 handlers are simple. If the language was much smaller, complexity would have to
 be pushed into helper functions and/or handlers. This is a tradeoff, and there
-is probably no right or wrong answer. We're using the helpers, but there's
-nothing wrong with dropping down a level when needed.
+is probably no right or wrong answer. Think about how this would relate to the
+programming languages you know. Simpler programming languages, pushes the
+complexity to the users, while in more expressive languages, the complexity can
+be hidden in libraries. We're using the helpers here, but there's nothing wrong
+with dropping down a level when needed.
 
 Our events is very simple
 #+begin_src fsharp
@@ -331,8 +337,8 @@ let handlers : Handler list = [
 ** Demoing our implementation
 And that should be everything needed to support our application. We can test it
 by running some events through the system. We first create a couple of
-orderlines and does some changes to them. Then we persist the result, and
-finally do some more changes and persist the result. We'll see that the second
+orderlines and does some changes to them. We then persist the result, and
+finally do some more changes and persist again. We'll see that the second
 persist will only process the new changes.
 
 #+begin_src fsharp
@@ -416,7 +422,9 @@ New state: { Data = map [(1, (1, 2)); (2, (1, 2))]
 This concludes our little demo, with an architecture which is pure, immutable,
 and side-effect free. The side-effects is pushed to the boundaries, making the
 core of the application easy to test and make bug free. Check out the repository
-for some code and the larger demo based on the production application.
+for some code and the larger demo based on the production application. If you're
+interested in learning more about F#, I wrote a short post with various useful
+links at the [[https://functional.christmas/2020/17][Getting Started With F#]] calendar post.
 
 * Larger production-like demo program
 I recommend looking at the ~Small.fs~ program and reading the walkthrough of that
